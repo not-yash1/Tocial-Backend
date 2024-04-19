@@ -5,12 +5,8 @@ const {sendMail} = require('../middlewares/sendMail');
 const cloudinary = require("cloudinary");
 
 exports.register = async (req, res) => {
-
     try {
-
         const {name, email, password, username, avatar} = req.body;
-
-        console.log(req.body)
 
         let user = await User.findOne({email});
 
@@ -35,11 +31,12 @@ exports.register = async (req, res) => {
         });
 
         const token = await user.generateToken();
-        console.log(token);
 
         const options = {
-            expires:new Date(Date.now()+90*24*60*60*1000),
+            expires:new Date(Date.now()+process.env.COOKIE_EXPIRE*24*60*60*1000),
             httpOnly: true,
+            sameSite: "None",
+            secure: true
         }
 
         res.status(201).cookie("token", token, options).json({
@@ -89,17 +86,15 @@ exports.loginUser = async(req, res)=>{
                 success: false,
                 message: "Invalid password"
             });
-            
         };
 
         const token = await user.generateToken();
-        console.log(token);
 
         const options = {
             expires:new Date(Date.now()+90*24*60*60*1000),
             httpOnly: true,
             secure: true,
-            sameSite: 'none'
+            sameSite: 'None'
         }
 
         res.status(200).cookie("token", token, options).json({
@@ -110,24 +105,20 @@ exports.loginUser = async(req, res)=>{
         
         
     } catch (error) {
-        console.log("Really Bad")
         res.status(500).json({
             success: false,
             message: error.message
         })
-        
     }
-    
 };
 
 exports.logoutUser = async(req, res)=>{
-
     try {
-
         res.status(200).cookie("token", null, {
-            expires: new Date(
-                Date.now()),
-                // httpOnly: true,
+            expires: new Date(Date.now()),
+            httpOnly: true,
+            sameSite: "none",
+            secure: true,
         }).json({
             success:true,
             message:"Logged out",
@@ -139,16 +130,12 @@ exports.logoutUser = async(req, res)=>{
             message: error.message
         })
     }
-
 }
 
 exports.followAndUnfollowUser = async(req, res)=>{
-
     try {
-
         const userToFollow = await User.findById(req.params.id);
         const loggedInUser = await User.findById(req.user._id);
-        // console.log(req.user._id);
 
         if(!userToFollow){
             return res.status(404).json({
@@ -163,7 +150,6 @@ exports.followAndUnfollowUser = async(req, res)=>{
         const followerIds = userToFollow.followers.map(follower => follower._id.toString());
 
         const userId = req.user._id.toString();
-        // console.log(userId);
 
         if(followerIds.includes(userId)){
 
@@ -257,11 +243,8 @@ exports.updatePassword = async(req, res)=>{
 
 
 exports.updateProfile = async (req, res) => {
-
     try {
-
         const user = await User.findById(req.user._id);
-        // console.log(req.user._id);
 
         const { name, email, username, avatar } = req.body
 
@@ -322,15 +305,9 @@ exports.updateProfile = async (req, res) => {
 }
 
 exports.deleteMyProfile = async (req, res) => {
-
-    // console.log(req.user._id);
     try {
-
-        // console.log(req.user._id);
         const user1 = await User.findById(req.user._id);
-        // console.log(user1._id);
 
-        // const Id = user._id;
         const posts = user1.posts;
 
         const followers = user1.followers;
@@ -368,16 +345,13 @@ exports.deleteMyProfile = async (req, res) => {
             const post = await Post.findById(allPosts[i]._id);
 
             for(let j = 0; j < post.comments.length; j++){
-                // console.log("Each single comment: ", post.comments[j]);
                 if(post.comments[j].user.toString()===user1._id.toString()){
                     post.comments.splice(j,1);
                     j-=1;
                 }
             }
 
-            // console.log("Without saving: ", post.comments)
             await post.save();
-            // console.log("With saving: ", post.comments)
         }
 
         // Removing all likes of user from all the posts
@@ -395,12 +369,6 @@ exports.deleteMyProfile = async (req, res) => {
             await post.save();
         }
 
-
-        // let i=0;
-        // while(posts.length){
-        //     await Post.findByIdAndDelete(posts[i]);
-        // }
-
         await User.findByIdAndDelete(req.user._id);
 
         // Logout User after deleting profile
@@ -410,7 +378,6 @@ exports.deleteMyProfile = async (req, res) => {
                 Date.now()),
                 httpOnly: true,
         })
-
 
         // Delete all posts of the user
         // Removing all photos from cloudinary
@@ -431,13 +398,10 @@ exports.deleteMyProfile = async (req, res) => {
             message: error.message
         })
     }
-
 }
 
 exports.myProfile = async (req, res) => {
-    
     try {
-
         const user = await User.findById(req.user._id).populate("posts followers following");
 
         res.status(200).json({
@@ -518,7 +482,6 @@ exports.forgotPassword = async (req, res) => {
         }
 
         const resetToken = user.getResetPasswordToken();
-        // console.log(resetToken);
 
         await user.save();
 
@@ -528,7 +491,6 @@ exports.forgotPassword = async (req, res) => {
 
 
         try{
-
             await sendMail({
                 email: user.email,
                 // to: user.email,
@@ -540,7 +502,6 @@ exports.forgotPassword = async (req, res) => {
                 success:true,
                 message: `Email sent to ${user.email} successfully`,
             })
-            
         } catch (error) {
             user.resetPasswordToken = undefined;
             user.resetPasswordExpire = undefined;
@@ -552,7 +513,6 @@ exports.forgotPassword = async (req, res) => {
                 message: error.message
             })
         }
-
         
     } catch (error) {
         res.status(500).json({
@@ -560,13 +520,10 @@ exports.forgotPassword = async (req, res) => {
             message: error.message
         })
     }
-
 }
 
 exports.resetPassword = async (req, res) => {
-
     try {
-
         const resetPasswordToken = crypto.createHash("sha256").update(req.params.token).digest("hex");
 
         const user = await User.findOne({
@@ -608,9 +565,7 @@ exports.resetPassword = async (req, res) => {
 }
 
 exports.getMyPosts = async (req, res) => {
-
     try {
-
         const user = await User.findById(req.user._id);
 
         const posts = [];
@@ -631,13 +586,10 @@ exports.getMyPosts = async (req, res) => {
             message: error.message
         })
     }
-
 }
 
 exports.getUserPosts = async (req, res) => {
-
     try {
-
         const user = await User.findById(req.params.id);
 
         const posts = [];
@@ -658,5 +610,4 @@ exports.getUserPosts = async (req, res) => {
             message: error.message
         })
     }
-
 }

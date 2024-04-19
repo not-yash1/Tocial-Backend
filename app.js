@@ -1,25 +1,19 @@
 const express = require("express");
-const app = express();
 const cookieParser = require("cookie-parser");
 const cors = require('cors');
+const dotenv = require('dotenv')
 
+const app = express();
 
-if(process.env.NODE_ENV !== "production") {
-    require("dotenv").config({path:"config/config.env"});
-}
+dotenv.config({ path: "./config/config.env" })
 
-// const corsOptions = {
-//   origin: 'http://localhost:3000',
-//   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-// };
-
-const corsOptions = {
-  origin: 'https://tocial.netlify.app',
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-};
-
-app.use(cors(corsOptions));
-
+app.use(
+  cors({
+    origin: [process.env.LOCAL_URL, process.env.WEB_URL],
+    methods: "GET,POST,PUT,DELETE",
+    credentials: true,
+  })
+);
 
 //Using middlewares
 app.use(express.json({limit: '50mb'}));
